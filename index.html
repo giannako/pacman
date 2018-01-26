@@ -7,17 +7,23 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #000;
+            background-image: url("assets/background.jpg");
+		background-attachment : fixed;
+		background-size : 100% auto;
         }
     </style>
     <script src="//cdn.jsdelivr.net/phaser/2.2.2/phaser.min.js"></script>
 </head>
 <body>
-
+	
+	<audio autoplay loop>
+		<source src="assets/MarioMusic.mp3" type="audio/mp3">
+   	</audio>
+	
     <script type="text/javascript">
 
-    var game = new Phaser.Game(448, 496, Phaser.AUTO);
-
+    var game = new Phaser.Game(450, 550, Phaser.AUTO);
+        
     var Pacman = function (game) {
 
         this.map = null;
@@ -39,6 +45,11 @@
         this.current = Phaser.NONE;
         this.turning = Phaser.NONE;
 
+        this.score = 0;
+        this.scoreText = '';
+        
+        this.bonus = 0;
+        this.bonusText = '';
     };
 
     Pacman.prototype = {
@@ -59,14 +70,16 @@
 
             //  We need this because the assets are on github pages
             //  Remove the next 2 lines if running locally
-            this.load.baseURL = 'https://ioniodi.github.io/pacman/';
+            this.load.baseURL = 'https://psbiliri.github.io/pacman/';
             this.load.crossOrigin = 'anonymous';
 
-            this.load.image('dot', 'assets/dot.png');
+            this.load.image('dot', 'assets/coin.png');
+	    this.load.image('mushroom', 'assets/mushroom.png');
+	    this.load.image('hat', 'assets/hat.png');
             this.load.image('tiles', 'assets/pacman-tiles.png');
-            this.load.spritesheet('pacman', 'assets/pacman.png', 32, 32);
-            this.load.tilemap('map', 'assets/pacman-map.json', null, Phaser.Tilemap.TILED_JSON);
-
+            this.load.spritesheet('pacman', 'assets/superMario.png', 32, 32);
+            this.load.tilemap('map', 'assets/superMario_pacman-map.json', null, Phaser.Tilemap.TILED_JSON);
+           
             //  Needless to say, graphics (C)opyright Namco
 
         },
@@ -79,12 +92,18 @@
             this.layer = this.map.createLayer('Pacman');
 
             this.dots = this.add.physicsGroup();
+	    this.mushroom = this.add.physicsGroup();
 
             this.map.createFromTiles(7, this.safetile, 'dot', this.layer, this.dots);
+	    
+	    this.map.createFromTiles(35, this.safetile, 'mushroom', this.layer, this.mushroom);
 
             //  The dots will need to be offset by 6px to put them back in the middle of the grid
             this.dots.setAll('x', 6, false, false, 1);
             this.dots.setAll('y', 6, false, false, 1);
+		
+	    this.mushroom.setAll('x', 6, false, false, 1);
+            this.mushroom.setAll('y', 6, false, false, 1);
 
             //  Pacman should collide with everything except the safe tile
             this.map.setCollisionByExclusion([this.safetile], true, this.layer);
@@ -101,7 +120,20 @@
 
             this.pacman.play('munch');
             this.move(Phaser.LEFT);
-
+            
+            this.scoreText = game.add.text(0, 500, 'Score: 0', { fontSize: '20px Arial', fill: 'white' });
+		
+            this.bonusText = game.add.text(300, 500, 'Bonus: 0', { fontSize: '20px Arial', fill: 'white' });
+		
+	    hat = game.add.group();	
+		
+	    for (var i= 0; i< 3; i++){
+		    var pacman = hat.create( game.world.width - 280 + (40*i), 517, 'hat');
+		    pacman.anchor.setTo(0.5, 0.5);
+		    pacman.angle = 0;
+		    pacman.alpha = 0.4;
+	    }
+      
         },
 
         checkKeys: function () {
@@ -221,18 +253,40 @@
         eatDot: function (pacman, dot) {
 
             dot.kill();
+            
+            var audio = new Audio('assets/EatCoin.mp3');
+            audio.play()
+            
+            this.score += 1;
+            this.scoreText.text = 'Score:' + this.score;
+        
+            if(this.dots.total===0){
+           	 this.dots.callAll('revive');
+	    }
+		
+	},
+	    
+	eatBonus: function (pacman, mushroom) {
 
-            if (this.dots.total === 0)
-            {
-                this.dots.callAll('revive');
+            mushroom.kill();
+            
+            var audio = new Audio('assets/EatCoin.mp3');
+            audio.play()
+            
+            this.bonus += 5;
+            this.bonusText.text = 'Bonus:' + this.bonus;
+        
+            if(this.mushroom.total===0){
+           	 this.mushroom.callAll('revive');
             }
-
-        },
+		
+	},
 
         update: function () {
           
             this.physics.arcade.collide(this.pacman, this.layer);
             this.physics.arcade.overlap(this.pacman, this.dots, this.eatDot, null, this);
+            this.physics.arcade.overlap(this.pacman, this.mushroom, this.eatBonus, null, this);
 
             this.marker.x = this.math.snapToFloor(Math.floor(this.pacman.x), this.gridsize) / this.gridsize;
             this.marker.y = this.math.snapToFloor(Math.floor(this.pacman.y), this.gridsize) / this.gridsize;
